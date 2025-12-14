@@ -1,0 +1,809 @@
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TaskFlow - Smart Task Management</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style id="app-style">
+    body {
+      font-family: 'Inter', sans-serif;
+      transition: background-color 0.3s, color 0.3s;
+    }
+    
+    .dark {
+      --bg-primary: #1a202c;
+      --bg-secondary: #2d3748;
+      --text-primary: #f7fafc;
+      --text-secondary: #cbd5e0;
+      --accent: #4c51bf;
+    }
+    
+    .light {
+      --bg-primary: #f7fafc;
+      --bg-secondary: #edf2f7;
+      --text-primary: #1a202c;
+      --text-secondary: #4a5568;
+      --accent: #5a67d8;
+    }
+    
+    .dark-mode {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+    }
+    
+    .sidebar {
+      transition: transform 0.3s ease;
+    }
+    
+    .sidebar.collapsed {
+      transform: translateX(-100%);
+    }
+    
+    .sidebar-link {
+      transition: all 0.2s;
+    }
+    
+    .sidebar-link:hover {
+      background-color: rgba(107, 114, 128, 0.1);
+    }
+    
+    .sidebar-link.active {
+      border-left-width: 4px;
+      padding-left: 1rem;
+    }
+    
+    .task-item {
+      transition: all 0.2s;
+    }
+    
+    .task-item:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    .priority-high {
+      background-color: rgba(239, 68, 68, 0.1);
+      color: rgb(239, 68, 68);
+    }
+    
+    .priority-medium {
+      background-color: rgba(245, 158, 11, 0.1);
+      color: rgb(245, 158, 11);
+    }
+    
+    .priority-low {
+      background-color: rgba(16, 185, 129, 0.1);
+      color: rgb(16, 185, 129);
+    }
+    
+    .slide-down {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease-out;
+    }
+    
+    .slide-down.open {
+      max-height: 600px;
+    }
+    
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 50px;
+      height: 24px;
+    }
+    
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ccc;
+      transition: .4s;
+      border-radius: 34px;
+    }
+    
+    .toggle-slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 4px;
+      bottom: 3px;
+      background-color: white;
+      transition: .4s;
+      border-radius: 50%;
+    }
+    
+    input:checked + .toggle-slider {
+      background-color: var(--accent);
+    }
+    
+    input:checked + .toggle-slider:before {
+      transform: translateX(24px);
+    }
+    
+    .analytics-card {
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .analytics-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+    }
+    
+    @media (max-width: 768px) {
+      .sidebar {
+        position: fixed;
+        z-index: 50;
+        height: 100vh;
+      }
+      
+      .main-content {
+        margin-left: 0;
+      }
+    }
+  </style>
+</head>
+<body class="light dark-mode flex flex-col min-h-screen">
+  <div class="flex flex-1 overflow-hidden">
+    <!-- Sidebar -->
+    <aside id="sidebar" class="sidebar bg-gray-800 text-white w-64 flex-shrink-0 h-screen">
+      <div class="px-6 py-4">
+        <div class="flex items-center justify-between">
+          <h1 class="text-2xl font-bold text-white">TaskFlow</h1>
+          <button id="toggle-sidebar" class="md:hidden text-white p-2">
+            <i class="fas fa-bars"></i>
+          </button>
+        </div>
+        <p class="text-gray-400 text-sm">Smart Task Management</p>
+      </div>
+      <nav class="mt-8">
+        <ul>
+          <li>
+            <a href="javascript:void(0)" class="sidebar-link flex items-center px-6 py-3 text-gray-100 hover:bg-gray-700" data-view="all-tasks">
+              <i class="fas fa-tasks w-5 mr-3"></i>
+              <span>All Tasks</span>
+            </a>
+          </li>
+          <li>
+            <a href="javascript:void(0)" class="sidebar-link flex items-center px-6 py-3 text-gray-300 hover:bg-gray-700" data-view="today">
+              <i class="fas fa-calendar-day w-5 mr-3"></i>
+              <span>Today</span>
+            </a>
+          </li>
+          <li>
+            <a href="javascript:void(0)" class="sidebar-link flex items-center px-6 py-3 text-gray-300 hover:bg-gray-700" data-view="upcoming">
+              <i class="fas fa-calendar-alt w-5 mr-3"></i>
+              <span>Upcoming</span>
+            </a>
+          </li>
+          <li>
+            <a href="javascript:void(0)" class="sidebar-link flex items-center px-6 py-3 text-gray-300 hover:bg-gray-700" data-view="completed">
+              <i class="fas fa-check-circle w-5 mr-3"></i>
+              <span>Completed</span>
+            </a>
+          </li>
+          <li>
+            <a href="javascript:void(0)" class="sidebar-link flex items-center px-6 py-3 text-gray-300 hover:bg-gray-700" data-view="analytics">
+              <i class="fas fa-chart-line w-5 mr-3"></i>
+              <span>Analytics</span>
+            </a>
+          </li>
+          <li>
+            <a href="javascript:void(0)" class="sidebar-link flex items-center px-6 py-3 text-gray-300 hover:bg-gray-700" data-view="settings">
+              <i class="fas fa-cog w-5 mr-3"></i>
+              <span>Settings</span>
+            </a>
+          </li>
+        </ul>
+      </nav>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content flex-1 bg-gray-100 overflow-y-auto">
+      <header class="bg-white shadow-sm py-4 px-6 flex items-center justify-between sticky top-0 z-10">
+        <div class="flex items-center">
+          <button id="mobile-menu-button" class="md:hidden mr-4 text-gray-600">
+            <i class="fas fa-bars"></i>
+          </button>
+          <h2 id="current-view-title" class="text-xl font-semibold text-gray-800">All Tasks</h2>
+        </div>
+        <div class="flex items-center space-x-4">
+          <span class="text-sm text-gray-500">Welcome back!</span>
+          <div class="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white">
+            <i class="fas fa-user"></i>
+          </div>
+        </div>
+      </header>
+
+      <div id="view-container" class="p-6">
+        <!-- All Tasks View (Default) -->
+        <div id="all-tasks-view" class="view-content">
+          <div class="mb-6 flex flex-col md:flex-row md:items-center md:justify-between">
+            <div class="flex flex-col md:flex-row md:items-center mb-4 md:mb-0 space-y-3 md:space-y-0 md:space-x-4">
+              <div class="relative">
+                <input type="text" placeholder="Search tasks..." class="pl-10 pr-4 py-2 border rounded-lg w-full md:w-64">
+                <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+              </div>
+              <select class="border rounded-lg px-4 py-2 bg-white">
+                <option value="">All Priorities</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+              <select class="border rounded-lg px-4 py-2 bg-white">
+                <option value="">All Status</option>
+                <option value="pending">Pending</option>
+                <option value="in-progress">In Progress</option>
+                <option value="completed">Completed</option>
+              </select>
+            </div>
+            <button class="bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center">
+              <i class="fas fa-plus mr-2"></i>
+              Add Task
+            </button>
+          </div>
+
+          <div class="task-list space-y-4">
+            <!-- Empty state -->
+            <div class="empty-state bg-white rounded-lg p-8 text-center">
+              <div class="w-24 h-24 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
+                <i class="fas fa-tasks text-3xl text-gray-400"></i>
+              </div>
+              <h3 class="text-xl font-semibold text-gray-700 mb-2">No tasks yet</h3>
+              <p class="text-gray-500 mb-4">Start creating tasks to manage your work efficiently</p>
+              <button class="bg-indigo-600 text-white px-4 py-2 rounded-lg">
+                <i class="fas fa-plus mr-2"></i>
+                Add Your First Task
+              </button>
+            </div>
+            
+            <!-- Add this example task item with data-task-id (it would be hidden when empty-state is shown) -->
+            <div class="task-item bg-white rounded-lg shadow p-4 cursor-pointer" data-task-id="task-1">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                  <input type="checkbox" class="mr-3">
+                  <span class="font-medium">Example Task Title</span>
+                </div>
+                <span class="priority-high text-xs px-2 py-1 rounded-full">High</span>
+              </div>
+              <div class="text-sm text-gray-500 mt-2">Due: Jul 15, 2023</div>
+            </div>
+            
+            <!-- Additional example (would be dynamically generated) -->
+            <div class="task-item bg-white rounded-lg shadow p-4 cursor-pointer" data-task-id="task-2">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                  <input type="checkbox" class="mr-3">
+                  <span class="font-medium">Another Task Example</span>
+                </div>
+                <span class="priority-medium text-xs px-2 py-1 rounded-full">Medium</span>
+              </div>
+              <div class="text-sm text-gray-500 mt-2">Due: Jul 20, 2023</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Today View -->
+        <div id="today-view" class="view-content hidden">
+          <div class="mb-6 flex flex-col md:flex-row md:items-center md:justify-between">
+            <div class="flex flex-col md:flex-row md:items-center mb-4 md:mb-0 space-y-3 md:space-y-0 md:space-x-4">
+              <div class="relative">
+                <input type="text" placeholder="Search today's tasks..." class="pl-10 pr-4 py-2 border rounded-lg w-full md:w-64">
+                <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+              </div>
+              <select class="border rounded-lg px-4 py-2 bg-white">
+                <option value="">All Priorities</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+            </div>
+            <button class="bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center">
+              <i class="fas fa-plus mr-2"></i>
+              Add Task
+            </button>
+          </div>
+
+          <div class="task-list space-y-4">
+            <!-- Empty state -->
+            <div class="empty-state bg-white rounded-lg p-8 text-center">
+              <div class="w-24 h-24 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
+                <i class="fas fa-calendar-day text-3xl text-gray-400"></i>
+              </div>
+              <h3 class="text-xl font-semibold text-gray-700 mb-2">No tasks for today</h3>
+              <p class="text-gray-500 mb-4">Your day looks clear! Add tasks to plan your day.</p>
+              <button class="bg-indigo-600 text-white px-4 py-2 rounded-lg">
+                <i class="fas fa-plus mr-2"></i>
+                Add Task for Today
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Upcoming View -->
+        <div id="upcoming-view" class="view-content hidden">
+          <div class="mb-6 flex flex-col md:flex-row md:items-center md:justify-between">
+            <div class="flex flex-col md:flex-row md:items-center mb-4 md:mb-0 space-y-3 md:space-y-0 md:space-x-4">
+              <div class="relative">
+                <input type="text" placeholder="Search upcoming tasks..." class="pl-10 pr-4 py-2 border rounded-lg w-full md:w-64">
+                <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+              </div>
+              <select class="border rounded-lg px-4 py-2 bg-white">
+                <option value="">All Priorities</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+            </div>
+            <button class="bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center">
+              <i class="fas fa-plus mr-2"></i>
+              Add Task
+            </button>
+          </div>
+
+          <div class="task-list space-y-4">
+            <!-- Empty state -->
+            <div class="empty-state bg-white rounded-lg p-8 text-center">
+              <div class="w-24 h-24 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
+                <i class="fas fa-calendar-alt text-3xl text-gray-400"></i>
+              </div>
+              <h3 class="text-xl font-semibold text-gray-700 mb-2">No upcoming tasks</h3>
+              <p class="text-gray-500 mb-4">Plan ahead by adding tasks for upcoming days</p>
+              <button class="bg-indigo-600 text-white px-4 py-2 rounded-lg">
+                <i class="fas fa-plus mr-2"></i>
+                Schedule a Task
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Completed View -->
+        <div id="completed-view" class="view-content hidden">
+          <div class="mb-6 flex flex-col md:flex-row md:items-center md:justify-between">
+            <div class="flex flex-col md:flex-row md:items-center mb-4 md:mb-0 space-y-3 md:space-y-0 md:space-x-4">
+              <div class="relative">
+                <input type="text" placeholder="Search completed tasks..." class="pl-10 pr-4 py-2 border rounded-lg w-full md:w-64">
+                <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+              </div>
+              <select class="border rounded-lg px-4 py-2 bg-white">
+                <option value="">All Time</option>
+                <option value="today">Today</option>
+                <option value="week">This Week</option>
+                <option value="month">This Month</option>
+              </select>
+            </div>
+            <button class="bg-red-500 text-white px-4 py-2 rounded-lg flex items-center">
+              <i class="fas fa-trash-alt mr-2"></i>
+              Clear Completed
+            </button>
+          </div>
+
+          <div class="task-list space-y-4">
+            <!-- Empty state -->
+            <div class="empty-state bg-white rounded-lg p-8 text-center">
+              <div class="w-24 h-24 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
+                <i class="fas fa-check-circle text-3xl text-gray-400"></i>
+              </div>
+              <h3 class="text-xl font-semibold text-gray-700 mb-2">No completed tasks</h3>
+              <p class="text-gray-500 mb-4">Tasks you complete will appear here</p>
+              <a href="javascript:void(0)" data-view="all-tasks" class="inline-block bg-indigo-600 text-white px-4 py-2 rounded-lg">
+                <i class="fas fa-list mr-2"></i>
+                Go to All Tasks
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Analytics View -->
+        <div id="analytics-view" class="view-content hidden">
+          <div class="mb-6 flex flex-wrap items-center justify-between">
+            <h3 class="text-xl font-semibold text-gray-700 mb-2 md:mb-0">Task Performance</h3>
+            <div class="flex items-center space-x-2">
+              <span class="text-sm text-gray-500">Time period:</span>
+              <select class="border rounded-lg px-4 py-2 bg-white">
+                <option value="week">Last 7 days</option>
+                <option value="month">Last 30 days</option>
+                <option value="quarter">Last 90 days</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <!-- Completion Rate Card -->
+            <div class="analytics-card bg-white rounded-lg shadow p-6">
+              <div class="flex items-center justify-between mb-4">
+                <h4 class="text-gray-500 text-sm font-medium">Completion Rate</h4>
+                <span class="bg-green-100 text-green-600 text-xs px-2 py-1 rounded-full">+4% vs last period</span>
+              </div>
+              <div class="flex items-center">
+                <span class="text-3xl font-bold text-gray-800">72%</span>
+                <div class="ml-4 w-16 h-16 rounded-full border-8 border-indigo-500 border-r-gray-200 border-b-gray-200"></div>
+              </div>
+            </div>
+
+            <!-- Overdue Tasks Card -->
+            <div class="analytics-card bg-white rounded-lg shadow p-6">
+              <div class="flex items-center justify-between mb-4">
+                <h4 class="text-gray-500 text-sm font-medium">Overdue Tasks</h4>
+                <span class="bg-red-100 text-red-600 text-xs px-2 py-1 rounded-full">+2 from yesterday</span>
+              </div>
+              <div class="flex items-center">
+                <span class="text-3xl font-bold text-gray-800">5</span>
+                <div class="ml-4 text-red-500">
+                  <i class="fas fa-exclamation-circle text-4xl"></i>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tasks by Priority Card -->
+            <div class="analytics-card bg-white rounded-lg shadow p-6">
+              <div class="flex items-center justify-between mb-4">
+                <h4 class="text-gray-500 text-sm font-medium">Tasks by Priority</h4>
+              </div>
+              <div class="flex items-center justify-between">
+                <div class="flex flex-col items-center">
+                  <span class="text-xl font-bold text-gray-800">7</span>
+                  <span class="text-red-500 text-xs">High</span>
+                </div>
+                <div class="flex flex-col items-center">
+                  <span class="text-xl font-bold text-gray-800">12</span>
+                  <span class="text-yellow-500 text-xs">Medium</span>
+                </div>
+                <div class="flex flex-col items-center">
+                  <span class="text-xl font-bold text-gray-800">8</span>
+                  <span class="text-green-500 text-xs">Low</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Completion Rate Chart -->
+            <div class="bg-white rounded-lg shadow p-6">
+              <h4 class="text-gray-700 font-medium mb-4">Completion Trend</h4>
+              <div class="h-64">
+                <canvas id="completionChart"></canvas>
+              </div>
+            </div>
+
+            <!-- Priority Distribution Chart -->
+            <div class="bg-white rounded-lg shadow p-6">
+              <h4 class="text-gray-700 font-medium mb-4">Tasks by Priority</h4>
+              <div class="h-64">
+                <canvas id="priorityChart"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Settings View -->
+        <div id="settings-view" class="view-content hidden">
+          <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-xl font-semibold text-gray-700 mb-6">App Settings</h3>
+            
+            <div class="mb-6">
+              <div class="flex items-center justify-between">
+                <div>
+                  <h4 class="text-lg font-medium text-gray-700">Dark Mode</h4>
+                  <p class="text-sm text-gray-500">Switch between light and dark themes</p>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="theme-toggle">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+            
+            <div class="pt-6 border-t border-gray-200">
+              <h4 class="text-lg font-medium text-gray-700 mb-4">Data Management</h4>
+              <div class="space-y-4">
+                <div>
+                  <button id="clear-data" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg flex items-center">
+                    <i class="fas fa-trash-alt mr-2"></i>
+                    Clear All Data
+                  </button>
+                  <p class="text-sm text-gray-500 mt-2">This will remove all your tasks and settings. This action cannot be undone.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Task Details Modal -->
+  <div id="task-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+    <div class="bg-white rounded-lg shadow-lg w-full max-w-md mx-4">
+      <div class="flex justify-between items-center border-b p-4">
+        <h3 class="text-xl font-semibold text-gray-800">Task Details</h3>
+        <button id="close-modal" class="text-gray-500 hover:text-gray-700">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="p-6">
+        <form id="task-form">
+          <div class="mb-4">
+            <label class="block text-gray-700 text-sm font-bold mb-2" for="task-title">
+              Task Title
+            </label>
+            <input id="task-title" type="text" placeholder="Enter task title" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+          </div>
+          <div class="mb-4">
+            <label class="block text-gray-700 text-sm font-bold mb-2" for="task-description">
+              Description
+            </label>
+            <textarea id="task-description" placeholder="Enter task description" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline h-24"></textarea>
+          </div>
+          <div class="mb-4 grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-gray-700 text-sm font-bold mb-2" for="task-date">
+                Due Date
+              </label>
+              <input id="task-date" type="date" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+            </div>
+            <div>
+              <label class="block text-gray-700 text-sm font-bold mb-2" for="task-priority">
+                Priority
+              </label>
+              <select id="task-priority" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </div>
+          </div>
+          <div class="mb-6">
+            <label class="block text-gray-700 text-sm font-bold mb-2">
+              Subtasks
+            </label>
+            <div id="subtasks-container" class="space-y-2">
+              <div class="flex items-center">
+                <input type="text" placeholder="Add subtask" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                <button type="button" class="ml-2 text-red-500">
+                  <i class="fas fa-trash-alt"></i>
+                </button>
+              </div>
+            </div>
+            <button type="button" id="add-subtask" class="mt-2 text-indigo-600 text-sm flex items-center">
+              <i class="fas fa-plus mr-1"></i> Add Subtask
+            </button>
+          </div>
+          <div class="flex justify-between">
+            <button type="button" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+              Delete
+            </button>
+            <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+              Save Task
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirmation Modal -->
+  <div id="confirmation-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+    <div class="bg-white rounded-lg shadow-lg w-full max-w-sm mx-4 p-6">
+      <h3 class="text-xl font-semibold text-gray-800 mb-4">Are you sure?</h3>
+      <p class="text-gray-600 mb-6">This will delete all your tasks and settings. This action cannot be undone.</p>
+      <div class="flex justify-end space-x-4">
+        <button id="cancel-clear" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+          Cancel
+        </button>
+        <button id="confirm-clear" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+          Delete All
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script id="app-script">
+    // DOM Elements
+    const sidebar = document.getElementById('sidebar');
+    const mobileMenuButton = document.getElementById('mobile-menu-button');
+    const toggleSidebarButton = document.getElementById('toggle-sidebar');
+    const viewLinks = document.querySelectorAll('.sidebar-link');
+    const viewContainer = document.getElementById('view-container');
+    const currentViewTitle = document.getElementById('current-view-title');
+    const themeToggle = document.getElementById('theme-toggle');
+    const clearDataBtn = document.getElementById('clear-data');
+    const taskModal = document.getElementById('task-modal');
+    const closeModalBtn = document.getElementById('close-modal');
+    const confirmationModal = document.getElementById('confirmation-modal');
+    const cancelClearBtn = document.getElementById('cancel-clear');
+    const confirmClearBtn = document.getElementById('confirm-clear');
+    
+    // Chart references
+    let completionChart = null;
+    let priorityChart = null;
+    
+    // Initialize app
+    document.addEventListener('DOMContentLoaded', () => {
+      // Toggle sidebar on mobile
+      mobileMenuButton.addEventListener('click', () => {
+        sidebar.classList.toggle('collapsed');
+      });
+      
+      toggleSidebarButton.addEventListener('click', () => {
+        sidebar.classList.toggle('collapsed');
+      });
+      
+      // View navigation
+      viewLinks.forEach(link => {
+        link.addEventListener('click', (e) => {
+          const viewId = link.getAttribute('data-view');
+          showView(viewId);
+          
+          // Update active state
+          viewLinks.forEach(vl => vl.classList.remove('active', 'border-l-4', 'border-indigo-500'));
+          link.classList.add('active', 'border-l-4', 'border-indigo-500');
+          
+          // Close sidebar on mobile after navigation
+          if (window.innerWidth < 768) {
+            sidebar.classList.add('collapsed');
+          }
+        });
+      });
+      
+      // Modal controls
+      closeModalBtn.addEventListener('click', () => {
+        taskModal.classList.add('hidden');
+      });
+      
+      // Clear data confirmation
+      clearDataBtn.addEventListener('click', () => {
+        confirmationModal.classList.remove('hidden');
+      });
+      
+      cancelClearBtn.addEventListener('click', () => {
+        confirmationModal.classList.add('hidden');
+      });
+      
+      confirmClearBtn.addEventListener('click', () => {
+        // This is where we would clear localStorage in a real app
+        confirmationModal.classList.add('hidden');
+        alert('All data has been cleared!');
+      });
+      
+      // Theme toggle
+      themeToggle.addEventListener('change', () => {
+        document.body.classList.toggle('light');
+        document.body.classList.toggle('dark');
+      });
+      
+      // Add event listener for task items
+      document.addEventListener('click', function(e) {
+        const taskItem = e.target.closest('.task-item');
+        if (taskItem) {
+          const taskId = taskItem.getAttribute('data-task-id');
+          if (taskId) {
+            // Open task details in modal
+            openTaskDetails(taskId);
+          }
+        }
+      });
+      
+      // Initialize charts when analytics view is shown
+      const analyticsViewLink = document.querySelector('[data-view="analytics"]');
+      analyticsViewLink.addEventListener('click', initCharts);
+      
+      // Show default view
+      showView('all-tasks');
+    });
+    
+    // Function to open task details
+    function openTaskDetails(taskId) {
+      console.log('Opening task details for:', taskId);
+      // In a real app, you'd fetch task details and populate the modal
+      taskModal.classList.remove('hidden');
+      
+      // Example of setting form values based on task ID
+      document.getElementById('task-title').value = 'Task #' + taskId;
+    }
+    
+    // View management
+    function showView(viewId) {
+      // Hide all views
+      const views = document.querySelectorAll('.view-content');
+      views.forEach(view => view.classList.add('hidden'));
+      
+      // Show selected view
+      const selectedView = document.getElementById(`${viewId}-view`);
+      if (selectedView) {
+        selectedView.classList.remove('hidden');
+        currentViewTitle.textContent = viewId.split('-').map(word => 
+          word.charAt(0).toUpperCase() + word.slice(1)
+        ).join(' ');
+      }
+    }
+    
+    // Initialize charts for analytics
+    function initCharts() {
+      // Completion Rate Chart
+      if (!completionChart) {
+        const completionCtx = document.getElementById('completionChart').getContext('2d');
+        completionChart = new Chart(completionCtx, {
+          type: 'line',
+          data: {
+            labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+            datasets: [{
+              label: 'Completion Rate (%)',
+              data: [65, 70, 62, 75, 68, 80, 72],
+              backgroundColor: 'rgba(79, 70, 229, 0.2)',
+              borderColor: 'rgba(79, 70, 229, 1)',
+              borderWidth: 2,
+              tension: 0.4
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              y: {
+                beginAtZero: true,
+                max: 100
+              }
+            }
+          }
+        });
+      }
+      
+      // Priority Distribution Chart
+      if (!priorityChart) {
+        const priorityCtx = document.getElementById('priorityChart').getContext('2d');
+        priorityChart = new Chart(priorityCtx, {
+          type: 'doughnut',
+          data: {
+            labels: ['High', 'Medium', 'Low'],
+            datasets: [{
+              label: 'Tasks by Priority',
+              data: [7, 12, 8],
+              backgroundColor: [
+                'rgba(239, 68, 68, 0.2)',
+                'rgba(245, 158, 11, 0.2)',
+                'rgba(16, 185, 129, 0.2)'
+              ],
+              borderColor: [
+                'rgba(239, 68, 68, 1)',
+                'rgba(245, 158, 11, 1)',
+                'rgba(16, 185, 129, 1)'
+              ],
+              borderWidth: 2
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                position: 'top',
+              },
+              tooltip: {
+                callbacks: {
+                  label: function(context) {
+                    return `${context.label}: ${context.parsed} tasks`;
+                  }
+                }
+              }
+            }
+          }
+        });
+      }
+    }
+  </script>
+</body>
+</html>
